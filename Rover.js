@@ -2,13 +2,16 @@ var Motor = require('./Motor.js').Motor;
 var MotorDirection = require('./Motor.js').MotorDirection;
 var heading = require('./heading');
 var manuevers = require('./manuevers')();
-
+var Calibrate = require('./Calibrate.js');
 
 
 function Rover(){
 	this.leftMotor = new Motor(5,6);
 	this.rightMotor = new Motor(22,27); 
 	this.compass = heading;	
+	this.calibrate = new Calibrate(this,{});
+			
+			
 	this.compass.on("ready", function() {
     console.log("headingchange");
     console.log("  heading : ", Math.floor(this.heading));
@@ -23,37 +26,55 @@ function Rover(){
 }
 
 Rover.prototype = {
+	
+	/*
+	// when the rover is initialize calibrate to determine how long it takes to 
+	// make a turn
+	*/
 	Init : function(callback){
 		var self = this;
-		this.Stop(
-				function(){
-					self.Calibrate(callback);
-				}
+		this.Stop(				
+				function(){self.Calibrate(callback);}
 			);
 		 
 	},
+	
+	/*
+	// set the rover to go foward
+	*/
 	Forward : function(){
 		this.rightMotor.setMotorDirection(MotorDirection.FORWARD);
 		this.leftMotor.setMotorDirection(MotorDirection.FORWARD);
 		this.Move();	
 	},
+	
+	/*
+	// set the rover to go back
+	*/
 	Back : function(){
 		this.rightMotor.setMotorDirection(MotorDirection.BACK);
 		this.leftMotor.setMotorDirection(MotorDirection.BACK);
 		this.Move();	
 	},
-	Stop : function(callback, options){ 
-		var pause = (options && options.pause) || 10;
+	/*
+	// set the rover to stop
+	*/
+	Stop : function(callback, pause){ 
+		pause = pause || 10;
 		this.rightMotor.setMotorDirection(MotorDirection.STOP);
 		this.leftMotor.setMotorDirection(MotorDirection.STOP);
 		this.Move();
-		setTimeout(callback,pause);
+		if(callback){
+			setTimeout(callback,pause);
+		}
 	},
+	
 	RotateRight: function(){ 
 		this.rightMotor.setMotorDirection(MotorDirection.BACK);
 		this.leftMotor.setMotorDirection(MotorDirection.FORWARD);
 		this.Move();
 	},
+	
 	RotateLeft: function(){ 
 		this.rightMotor.setMotorDirection(MotorDirection.FORWARD);
 		this.leftMotor.setMotorDirection(MotorDirection.BACK);
@@ -64,27 +85,41 @@ Rover.prototype = {
 		 this.rightMotor.setMotorDirection(direction);
 		 this.Move(); 
 	},
+	
 	setLeftMotor : function(direction){
 		 this.leftMotor.setMotorDirection(direction);
 		 this.Move();	 
 	},
+	
 	Move : function(){
-		this.rightMotor.Move();
-		this.leftMotor.Move();
+		 
 	},
 	
+	GetHeading : function(){
+		return this.compass.heading;		
+	},
 	
 	Calibrate : function(callback){
-		manuevers.calibrate(this,{},callback); 
+		this.calibrate.Execute(callback); 
+	},
+	GetTurnTime : function(turnDegrees){
+		return this.calibrate.GetTurnTime(turnDegrees);
+	},
+ 
+	SetHeading : function(TargetHeading,MaintainHeading, callBack){
+		manuevers.RotateToHeading(this,{TargetHeading: TargetHeading,MaintainHeading:MaintainHeading },callBack);		
 	},
 	
+	MoveForwardSameHeading : function(TimeSpanSeconds,Heading, callBack){
+		Heading = Heading || this.GetHeading();
+		manuevers.ForwardAtHeading(this, {TimeSpan: TimeSpanSeconds, TargetHeading: Heading},callBack);
+	},
 	
-	GetHeading :function(callback){
-		return this.compass.heading;
+	Square : function(){
+		manuevers.Square(this);
 	},
-	SetHeading : function(TargetHeading, callBack){
-		manuevers.rotateToHeading(this,{TargetHeading: TargetHeading,MaintainHeading:true},callBack);		
-	},
+	
+	 
 	getTurnDegrees : function(Target,Source){
 		var diff = Target - Source; 
 		if (diff < -180){
